@@ -5,7 +5,7 @@ const { body, validationResult } = require('express-validator');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const JWT_SECERT = "ravinderinotebook";
-
+const fetchuser = require('../middleware/fetchuser');
 //Create a User using: Post "/api/auth/createuser". No Login require
 router.post('/createuser',[
     body('name','Enter Valid name').notEmpty(),
@@ -47,4 +47,53 @@ router.post('/createuser',[
     }     
 })
 
+//Authenticate using: Post "/api/auth/login".
+router.post('/login',[
+    body('email','Enter Valid email').isEmail(),
+    body('password','password Can not be blank').trim().notEmpty(),
+  ], async (req, res) => {
+
+    // If there are errors, return bad request and the errors
+    const result = validationResult(req);
+    if (!result.isEmpty()) {
+        return res.status(400).json({ errors: result.array() });
+    }
+
+    const {email,password} = req.body;
+    try {
+        let user = await User.findOne({email}); 
+        if(!user){
+            return res.status(400).json({ errors: "Please try to login with correct credentials"});
+        }
+
+        const passwordcompare = await bcrypt.compare(password,user.password);
+        if(!passwordcompare){
+            return res.status(400).json({ errors: "Please try to login with correct credentials"});
+        }   
+        const data = {
+            user:{
+                id: user.id
+            }
+        }
+        const authToken = jwt.sign(data, JWT_SECERT);
+        res.json({authToken});             
+    } catch (error) {
+        console.error(error.message); 
+        res.status(500).send("Internal server error");    
+    }
+})
+
+//Authenticate using: Post "/api/auth/getuser".
+router.post('/getuser', fetchuser, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        console.log(userId);
+        console.log("test test");
+        const user = await User.findById(userId).select("-password");
+        res.send(user); 
+    } catch (error) {
+        console.error(error.message); 
+        res.status(500).send("some error occur");     
+    }
+})
 module.exports = router
